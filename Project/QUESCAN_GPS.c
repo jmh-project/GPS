@@ -1,61 +1,133 @@
 #include "TEECO_System.h"
 #include "DataLog.h"
 
-int ReceiveQuescanGPS( int ascii, int comPort ) {
-    
-	if(ascii == '$') {
-		gv.nFlag_ReceiveStart[comPort]=1;
-		gv.nReceiveBufferCount[comPort]=0;
-		gv.aItemReceiveBuffer[comPort][gv.nReceiveBufferCount[comPort]++] = ascii;
-	}
-	else if(gv.nFlag_ReceiveStart[comPort]==1) {
-		gv.aItemReceiveBuffer[comPort][gv.nReceiveBufferCount[comPort]++] = ascii;
-        
-		if(ascii==0x0A) {
-            if((gv.aItemReceiveBuffer[comPort][1]) == 'G') && (gv.aItemReceiveBuffer[comPort][2] == 'P') && 
-            (gv.aItemReceiveBuffer[comPort][3] == 'R') && (gv.aItemReceiveBuffer[comPort][4] == 'M') && (gv.aItemReceiveBuffer[comPort][5] == 'C'))
-            {
-                if(gv.aItemReceiveBuffer[comPort][18] == 'V') //데이터송신대기
-                {
-                    gv.nFlag_ReceiveStart[comPort]=0;
-                    gv.nReceiveBufferCount[comPort]=0;
-                }
-                else if(gv.aItemReceiveBuffer[comPort][18] == 'A' && gv.aItemReceiveBuffer[comPort][30] == 'N')
-                {
-                    //gv.nFlag_ReceiveDataProcess[comPort] = ENABLE;
-                    io.gpgamcAvalue[0]=io.buf[uart][20];
-                    io.gpgamcAvalue[1]=io.buf[uart][21];
-                    io.gpgamcAvalue[2]=io.buf[uart][22];
-                    io.gpgamcAvalue[3]=io.buf[uart][23];
-                    io.gpgamcAvalue[4]=io.buf[uart][24];
-                    io.gpgamcAvalue[5]=io.buf[uart][25];
-                    io.gpgamcAvalue[6]=io.buf[uart][26];
-                    io.gpgamcAvalue[7]=io.buf[uart][27];
-                    io.gpgamcAvalue[8]=io.buf[uart][28];
-                    io.gpgamcAvalue[9]=0;
-                    io.gpgamcNvalue[0]=io.buf[uart][32];
-                    io.gpgamcNvalue[1]=io.buf[uart][33];
-                    io.gpgamcNvalue[2]=io.buf[uart][34];
-                    io.gpgamcNvalue[3]=io.buf[uart][35];
-                    io.gpgamcNvalue[4]=io.buf[uart][36];
-                    io.gpgamcNvalue[5]=io.buf[uart][37];
-                    io.gpgamcNvalue[6]=io.buf[uart][38];
-                    io.gpgamcNvalue[7]=io.buf[uart][39];
-                    io.gpgamcNvalue[8]=io.buf[uart][40];
-                    io.gpgamcNvalue[9]=io.buf[uart][41];
-                    io.gpgamcNvalue[10]=0;
-                    
-                    gv.nFlag_ReceiveStart[comPort]=0;
-                    gv.nReceiveBufferCount[comPort]=0;
-                    
-                }
-            }
-            if(gv.nReceiveBufferCount[comPort] > 256) {
-                gv.nFlag_ReceiveStart[comPort]=0;
-                gv.nReceiveBufferCount[comPort]=0;
-                gv.nFlag_ReceiveDataProcess[comPort]=DISABLE;
-            }
+#define QUESCAN_GPS_FIELD_STATUS       2
+#define QUESCAN_GPS_FIELD_LATITUDE     3
+#define QUESCAN_GPS_FIELD_NS           4
+#define QUESCAN_GPS_FIELD_LONGITUDE    5
+#define QUESCAN_GPS_FIELD_EW           6
+#define QUESCAN_GPS_BUFFER_LIMIT       256
+
+static void QuescanGPS_ResetReceive(int comPort)
+{
+    gv.nFlag_ReceiveStart[comPort] = 0;
+    gv.nReceiveBufferCount[comPort] = 0;
+}
+
+static int QuescanGPS_CopyField(const unsigned char *sentence, int fieldNo, char *out, int outSize)
+{
+    int field = 0;
+    int i = 0;
+    int outIndex = 0;
+
+    if(outSize <= 0) {
+        return 0;
+    }
+
+    out[0] = 0;
+
+    while(sentence[i] != 0 && sentence[i] != '\r' && sentence[i] != '\n') {
+        if(sentence[i] == ',') {
+            field++;
+            i++;
+            continue;
         }
-	}
-	return 1;
+
+        if(sentence[i] == '*') {
+            break;
+        }
+
+        if(field == fieldNo) {
+            if(outIndex >= (outSize - 1)) {
+                break;
+            }
+            out[outIndex++] = (char)sentence[i];
+        }
+
+        i++;
+    }
+
+    out[outIndex] = 0;
+    return (outIndex > 0);
+}
+
+static float QuescanGPS_NmeaToDegree(const char *value, char direction)
+{
+    float nmea = (float)atof(value);
+    int degree = (int)(nmea / 100.0f);
+    float minute = nmea - ((float)degree * 100.0f);
+    float gps = (float)degree + (minute / 60.0f);
+
+    if(direction == 'S' || direction == 'W') {
+        gps = -gps;
+    }
+
+    return gps;
+}
+
+static void QuescanGPS_ProcessRmc(int comPort)
+{
+    unsigned char *sentence = gv.aItemReceiveBuffer[comPort];
+    char status[2];
+    char latitude[16];
+    char ns[2];
+    char longitude[16];
+    char ew[2];
+
+    if(sentence[0] != '$' ||
+       sentence[1] != 'G' ||
+       sentence[2] != 'P' ||
+       sentence[3] != 'R' ||
+       sentence[4] != 'M' ||
+       sentence[5] != 'C') {
+        return;
+    }
+
+    if(QuescanGPS_CopyField(sentence, QUESCAN_GPS_FIELD_STATUS, status, sizeof(status)) == 0) {
+        return;
+    }
+
+    if(status[0] != 'A') {
+        return;
+    }
+
+    if(QuescanGPS_CopyField(sentence, QUESCAN_GPS_FIELD_LATITUDE, latitude, sizeof(latitude)) == 0 ||
+       QuescanGPS_CopyField(sentence, QUESCAN_GPS_FIELD_NS, ns, sizeof(ns)) == 0 ||
+       QuescanGPS_CopyField(sentence, QUESCAN_GPS_FIELD_LONGITUDE, longitude, sizeof(longitude)) == 0 ||
+       QuescanGPS_CopyField(sentence, QUESCAN_GPS_FIELD_EW, ew, sizeof(ew)) == 0) {
+        return;
+    }
+
+    flash.Uart[comPort]->SensorPV[0] = QuescanGPS_NmeaToDegree(latitude, ns[0]);
+    flash.Uart[comPort]->SensorPV[1] = QuescanGPS_NmeaToDegree(longitude, ew[0]);
+}
+
+int ReceiveQuescanGPS(int ascii, int comPort)
+{
+    if(comPort < 0 || comPort >= USART_MAX) {
+        return 0;
+    }
+
+    if(ascii == '$') {
+        gv.nFlag_ReceiveStart[comPort] = 1;
+        gv.nReceiveBufferCount[comPort] = 0;
+        gv.aItemReceiveBuffer[comPort][gv.nReceiveBufferCount[comPort]++] = (unsigned char)ascii;
+    }
+    else if(gv.nFlag_ReceiveStart[comPort] == 1) {
+        if(gv.nReceiveBufferCount[comPort] >= (QUESCAN_GPS_BUFFER_LIMIT - 1)) {
+            QuescanGPS_ResetReceive(comPort);
+            gv.nFlag_ReceiveDataProcess[comPort] = DISABLE;
+            return 1;
+        }
+
+        gv.aItemReceiveBuffer[comPort][gv.nReceiveBufferCount[comPort]++] = (unsigned char)ascii;
+        gv.aItemReceiveBuffer[comPort][gv.nReceiveBufferCount[comPort]] = 0;
+
+        if(ascii == 0x0A) {
+            QuescanGPS_ProcessRmc(comPort);
+            QuescanGPS_ResetReceive(comPort);
+        }
+    }
+
+    return 1;
 }
