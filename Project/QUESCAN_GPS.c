@@ -51,16 +51,12 @@ static int QuescanGPS_CopyField(const unsigned char *sentence, int fieldNo, char
     return (outIndex > 0);
 }
 
-static float QuescanGPS_NmeaToDegree(const char *value, char direction)
+static float QuescanGPS_NmeaToDegree(const char *value)
 {
     float nmea = (float)atof(value);
     int degree = (int)(nmea / 100.0f);
     float minute = nmea - ((float)degree * 100.0f);
     float gps = (float)degree + (minute / 60.0f);
-
-    if(direction == 'S' || direction == 'W') {
-        gps = -gps;
-    }
 
     return gps;
 }
@@ -98,8 +94,12 @@ static void QuescanGPS_ProcessRmc(int comPort)
         return;
     }
 
-    flash.Uart[comPort]->SensorPV[0] = QuescanGPS_NmeaToDegree(latitude, ns[0]);
-    flash.Uart[comPort]->SensorPV[1] = QuescanGPS_NmeaToDegree(longitude, ew[0]);
+    if(ns[0] != 'N' || ew[0] != 'E') {
+        return;
+    }
+
+    flash.Uart[comPort]->SensorPV[0] = QuescanGPS_NmeaToDegree(latitude);
+    flash.Uart[comPort]->SensorPV[1] = QuescanGPS_NmeaToDegree(longitude);
 }
 
 int ReceiveQuescanGPS(int ascii, int comPort)
