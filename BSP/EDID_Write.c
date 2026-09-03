@@ -1,0 +1,265 @@
+#include "TEECO_System.h"
+
+#define		EDID_SDA			GPIO_Pin_8
+#define		EDID_SCL			GPIO_Pin_5
+
+#define		EDID_SCL_High()			GPIOC->BSRRL = EDID_SCL
+#define		EDID_SCL_Low()			GPIOC->BSRRH = EDID_SCL
+
+#define		EDID_SDA_High()		GPIOB->BSRRL = EDID_SDA
+#define		EDID_SDA_Low()			GPIOB->BSRRH = EDID_SDA
+
+void EDID_I2C_Delay(void)
+{
+	int s=5000;
+	while(s--);
+	//Delay(1);
+}
+
+//I2C 엔진을 사용하지 않고 Port로 I2C 를 구현할때 사용하고자 만들었다.
+void EDID_BSP_I2C_PortInit(void)
+{
+	GPIO_InitTypeDef  GPIO_InitStructure;
+  	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB | RCC_AHB1Periph_GPIOC, ENABLE);
+	
+  	GPIO_InitStructure.GPIO_Pin = EDID_SDA;
+  	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+  	GPIO_InitStructure.GPIO_OType = GPIO_OType_OD;
+  	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+  	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_Init(GPIOB, &GPIO_InitStructure); 
+	GPIOB->BSRRL = EDID_SDA;
+	
+  	GPIO_InitStructure.GPIO_Pin = EDID_SCL;
+  	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+  	GPIO_InitStructure.GPIO_OType = GPIO_OType_OD;
+  	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+  	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_Init(GPIOC, &GPIO_InitStructure); 
+	GPIOC->BSRRL = EDID_SCL;
+}
+
+//I2C Data Port는 입력과 출력이 되어야하므로 입력으로 전환 시킬때 사용하는 함수이다.
+void EDID_I2CSDAPort_Input(void)
+{
+	GPIO_InitTypeDef  GPIO_InitStructure;
+
+  	GPIO_InitStructure.GPIO_Pin =  EDID_SDA;
+  	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
+  	GPIO_InitStructure.GPIO_OType = GPIO_OType_OD;
+  	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+  	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+  	GPIO_Init(GPIOB, &GPIO_InitStructure); 
+}
+
+//I2C Data Port는 입력과 출력이 되어야하므로 출력으로 전환 시킬때 사용하는 함수이다.
+void EDID_I2CSDAPort_Output(void)
+{
+	GPIO_InitTypeDef  GPIO_InitStructure;
+
+  	GPIO_InitStructure.GPIO_Pin =  EDID_SDA;
+  	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+  	GPIO_InitStructure.GPIO_OType = GPIO_OType_OD;
+  	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+  	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+  	GPIO_Init(GPIOB, &GPIO_InitStructure);
+}
+
+//I2C Start 시그널발생
+void EDID_I2C_Start(void)
+{
+    EDID_I2CSDAPort_Output();
+	EDID_SDA_High();
+	EDID_SCL_High();	
+	EDID_I2C_Delay();
+
+	EDID_SDA_Low();	EDID_I2C_Delay();	EDID_I2C_Delay();
+	EDID_SCL_Low();	EDID_I2C_Delay();
+}
+
+//I2C Stop 시그널발생
+void EDID_I2C_Stop(void)
+{
+    EDID_I2CSDAPort_Output();
+	EDID_SDA_Low();		
+	EDID_SCL_Low();
+			
+	EDID_SCL_High();	EDID_I2C_Delay(); EDID_I2C_Delay();
+	EDID_SDA_High();	EDID_I2C_Delay(); EDID_I2C_Delay();
+}
+
+void EDID_I2C_Clk(void)
+{
+	EDID_SCL_High();	EDID_I2C_Delay();
+	EDID_SCL_Low();	EDID_I2C_Delay();
+}
+
+void EDID_I2C_Clock_Data( u8 data)
+{
+   	if(data & 0x80) GPIO_SetBits(GPIOB, EDID_SDA);
+   	else  GPIO_ResetBits(GPIOB, EDID_SDA);
+	EDID_I2C_Delay();
+	EDID_I2C_Clk();
+   	if(data & 0x40) GPIO_SetBits(GPIOB, EDID_SDA);
+   	else  GPIO_ResetBits(GPIOB, EDID_SDA);
+	EDID_I2C_Delay();
+	EDID_I2C_Clk();
+   	if(data & 0x20) GPIO_SetBits(GPIOB, EDID_SDA);
+   	else  GPIO_ResetBits(GPIOB, EDID_SDA);
+	EDID_I2C_Delay();
+	EDID_I2C_Clk();
+   	if(data & 0x10) GPIO_SetBits(GPIOB, EDID_SDA);
+   	else  GPIO_ResetBits(GPIOB, EDID_SDA);
+	EDID_I2C_Delay();
+	EDID_I2C_Clk();
+   	if(data & 0x08) GPIO_SetBits(GPIOB, EDID_SDA);
+   	else  GPIO_ResetBits(GPIOB, EDID_SDA);
+	EDID_I2C_Delay();
+	EDID_I2C_Clk();
+   	if(data & 0x04) GPIO_SetBits(GPIOB, EDID_SDA);
+   	else  GPIO_ResetBits(GPIOB, EDID_SDA);
+	EDID_I2C_Delay();
+	EDID_I2C_Clk();
+   	if(data & 0x02) GPIO_SetBits(GPIOB, EDID_SDA);
+   	else  GPIO_ResetBits(GPIOB, EDID_SDA);
+	EDID_I2C_Delay();
+	EDID_I2C_Clk();
+   	if(data & 0x01) GPIO_SetBits(GPIOB, EDID_SDA);
+   	else  GPIO_ResetBits(GPIOB, EDID_SDA);
+	EDID_I2C_Delay();
+	EDID_I2C_Clk();
+}
+
+void EDID_I2C_ACK(void)
+{
+    EDID_I2CSDAPort_Input();
+	EDID_I2C_Delay();
+    GPIO_SetBits(GPIOC, EDID_SCL);//9번째 클럭
+	EDID_I2C_Delay();
+	EDID_I2C_Delay();
+
+    while(GPIO_ReadInputDataBit(GPIOB, EDID_SDA));
+	
+    GPIO_ResetBits(GPIOC, EDID_SCL);
+
+    EDID_I2CSDAPort_Output();
+}
+
+
+void EDID_Write( U8 addr, U8 data)
+{
+    EDID_I2C_Start();
+    EDID_I2C_Clock_Data(0xa0);           
+
+    EDID_I2C_ACK();                      
+
+    EDID_I2C_Clock_Data(addr);           
+
+	EDID_I2C_ACK();                      
+
+    EDID_I2C_Clock_Data(data);           
+
+    EDID_I2C_ACK();                      
+
+    EDID_I2C_Stop();                     
+}
+
+U8 EDID_Read( U8 addr )
+{
+    u8 data=0x00;
+
+    EDID_I2C_Start();
+    EDID_I2C_Clock_Data(0xa0);           
+    EDID_I2C_ACK();                      
+
+    EDID_I2C_Clock_Data(addr);
+    EDID_I2C_ACK();                      
+
+	EDID_I2C_Start();
+
+    EDID_I2C_Clock_Data(0xa1);
+    EDID_I2C_ACK();                      
+
+    EDID_I2CSDAPort_Input();
+
+	if(GPIO_ReadInputDataBit(GPIOB,EDID_SDA)) data |= 0x80;
+	EDID_I2C_Clk();
+	if(GPIO_ReadInputDataBit(GPIOB,EDID_SDA)) data |= 0x40;
+	EDID_I2C_Clk();
+	if(GPIO_ReadInputDataBit(GPIOB,EDID_SDA)) data |= 0x20;
+	EDID_I2C_Clk();
+	if(GPIO_ReadInputDataBit(GPIOB,EDID_SDA)) data |= 0x10;
+	EDID_I2C_Clk();
+	if(GPIO_ReadInputDataBit(GPIOB,EDID_SDA)) data |= 0x08;
+	EDID_I2C_Clk();
+	if(GPIO_ReadInputDataBit(GPIOB,EDID_SDA)) data |= 0x04;
+	EDID_I2C_Clk();
+	if(GPIO_ReadInputDataBit(GPIOB,EDID_SDA)) data |= 0x02;
+	EDID_I2C_Clk();
+	if(GPIO_ReadInputDataBit(GPIOB,EDID_SDA)) data |= 0x01;
+	EDID_I2C_Clk();
+
+    EDID_I2C_Stop();
+    return ( data );
+}
+
+const unsigned char DATA128[]=
+{
+0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x1e, 0x6d, 0xe3, 0x57, 0xa7, 0x3d, 0x01, 0x00,
+0x07, 0x15, 0x01, 0x03, 0x80, 0x33, 0x1d, 0x78, 0xea, 0xc6, 0x65, 0xa0, 0x59, 0x58, 0x9d, 0x27,
+0x0e, 0x50, 0x54, 0xa7, 0x6b, 0x80, 0xb3, 0x00, 0x81, 0x80, 0x81, 0x40, 0x71, 0x4f, 0x01, 0x01,
+0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x02, 0x3a, 0x80, 0x18, 0x71, 0x38, 0x2d, 0x40, 0x58, 0x2c,
+0x45, 0x00, 0xfe, 0x22, 0x11, 0x00, 0x00, 0x1e, 0x00, 0x00, 0x00, 0xfd, 0x00, 0x38, 0x4b, 0x1e,
+0x53, 0x0f, 0x00, 0x0a, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x00, 0x00, 0x00, 0xfc, 0x00, 0x45,
+0x32, 0x33, 0x36, 0x30, 0x0a, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x00, 0x00, 0x00, 0xff,
+0x00, 0x31, 0x30, 0x37, 0x4c, 0x54, 0x56, 0x42, 0x32, 0x44, 0x33, 0x31, 0x39, 0x0a, 0x00, 0x9b	,
+};
+
+const unsigned char DATA[]=
+{
+0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x4d, 0x29, 0x93, 0x52, 0x00, 0x00, 0x00, 0x00,
+0x05, 0x14, 0x01, 0x03, 0x80, 0x3a, 0x20, 0x78, 0x0a, 0x0d, 0xc9, 0xa0, 0x57, 0x47, 0x98, 0x27,
+0x12, 0x48, 0x4c, 0x00, 0x00, 0x00, 0x81, 0x80, 0x31, 0x59, 0x45, 0x59, 0x61, 0x59, 0x01, 0x01,
+0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x66, 0x21, 0x50, 0xb0, 0x51, 0x00, 0x1b, 0x30, 0x40, 0x70,
+0x36, 0x00, 0x44, 0x40, 0x21, 0x00, 0x00, 0x18, 0x0e, 0x1f, 0x00, 0x80, 0x51, 0x00, 0x1e, 0x30,
+0x40, 0x80, 0x37, 0x00, 0x10, 0x4e, 0x42, 0x00, 0x00, 0x1e, 0x00, 0x00, 0x00, 0xfc, 0x00, 0x4d,
+0x54, 0x32, 0x33, 0x48, 0x0a, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x00, 0x00, 0x00, 0xfd,
+0x00, 0x18, 0x55, 0x0e, 0x46, 0x10, 0x00, 0x0a, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x01, 0x3a,
+0x02, 0x03, 0x1b, 0x70, 0x46, 0x02, 0x03, 0x04, 0x22, 0x11, 0x12, 0x23, 0x09, 0x07, 0x07, 0x83,
+0x01, 0x00, 0x00, 0x67, 0x03, 0x0c, 0x00, 0x20, 0x00, 0xb8, 0x2d, 0x8c, 0x0a, 0xd0, 0x8a, 0x20,
+0xe0, 0x2d, 0x10, 0x10, 0x3e, 0x96, 0x00, 0x13, 0x8e, 0x21, 0x00, 0x00, 0x18, 0x8c, 0x0a, 0xd0,
+0x8a, 0x20, 0xe0, 0x2d, 0x10, 0x10, 0x3e, 0x96, 0x00, 0xc4, 0x8e, 0x21, 0x00, 0x00, 0x18, 0x01,
+0x1d, 0x00, 0x72, 0x51, 0xd0, 0x1e, 0x20, 0x6e, 0x28, 0x55, 0x00, 0xc4, 0x8e, 0x21, 0x00, 0x00,
+0x1e, 0x01, 0x1d, 0x80, 0x18, 0x71, 0x38, 0x2d, 0x40, 0x58, 0x2c, 0x45, 0x00, 0xc4, 0x8e, 0x21,
+0x00, 0x00, 0x1e, 0x8c, 0x0a, 0xd0, 0x90, 0x20, 0x40, 0x31, 0x20, 0x0c, 0x40, 0x55, 0x00, 0xc4,
+0x8e, 0x21, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xb8
+};
+
+void EDID_Test(void)
+{
+	uint8_t	data;
+	EDID_BSP_I2C_PortInit();
+	
+	Delay(100);
+	Dprintf("EDID Read Write Test\n");
+	
+	for(int i=0; i<128; i++)
+	{
+		data = DATA128[i];
+		EDID_Write(i, data);
+		Delay(5);
+		//Dprintf(" %02x", data);
+	}
+	
+	Dprintf("EDID Read Read Test\n");
+	for(int i=0; i<128; i++)
+	{
+		data = EDID_Read(i);
+		Dprintf(" %02x", data);
+	}
+}
+
+
+
+
+

@@ -1,0 +1,11 @@
+#start@
+#title@Teeco F/W & Resource Update!
+//#nandformat@
+//#resource_folder_copy@SystemFont!
+//#resource_folder_copy@unicode_Font!
+//#resource_folder_copy@keyboard_bmp!
+//#resource_folder_copy@KeyButton_image!
+//#resource_folder_copy@KeyBoard_image!
+//#resource_folder_copy@WindowsCaption_image!
+#fw_up_grade@TEECO.bin!
+#end@

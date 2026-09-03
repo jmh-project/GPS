@@ -1,0 +1,17 @@
+# Windows/editor noise
+desktop.ini
+~$*
+*.tmp
+*.bak
+
+# Keil/MDK build products
+Project/MDK/
+Project/*.axf
+Project/*.bin
+Project/*.build_log.htm
+Project/*.dep
+Project/*.lnp
+Project/*.map
+Project/JLinkLog.txt
+Project/*.uvguix.*
+

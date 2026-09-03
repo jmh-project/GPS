@@ -1,0 +1,398 @@
+/******************************************************************************
+*    	File name	: BSP_ADV7611.c 
+*		Date		: 2014 / 09 / 22
+*		Author		: BJ Song
+******************************************************************************/
+//스마트폰의 HDMI 출력을 받아 DIgital RGB(ITU656)로 변환하는 칩인 ADV7611
+//의 설정을 하는 코드이다.
+#ifdef __cplusplus
+ extern "C" {
+#endif
+
+
+/******************************************************************************
+							Include File
+******************************************************************************/
+#include "TEECO_System.h"
+
+#ifdef ADV7611_USE
+/******************************************************************************
+							Constant & Macros
+******************************************************************************/
+
+/******************************************************************************
+							Private & Local Variables
+******************************************************************************/
+
+/******************************************************************************
+							Function Prototype
+******************************************************************************/
+void ADV7611_Write(uint8_t slv_addr, uint8_t sub_addr, uint8_t data);
+uint8_t ADV7611_Read(uint8_t slv_addr, uint8_t sub_addr);
+
+void ADV7611_Init(void)
+{
+	ADV7611_Write(0x98, 0xF4, 0x80);
+	ADV7611_Write(0x98, 0xF5, 0x7C);
+	ADV7611_Write(0x98, 0xF8, 0x4C);
+	ADV7611_Write(0x98, 0xF9, 0x64);
+	ADV7611_Write(0x98, 0xFA, 0x6C);
+	ADV7611_Write(0x98, 0xFB, 0x68);
+	ADV7611_Write(0x98, 0xFD, 0x44);
+	
+	
+	ADV7611_Write(0x98, 0x01, 0x06);
+	ADV7611_Write(0x98, 0x02, 0xF7);
+	
+	ADV7611_Write(0x98, 0x03, 0x40);
+	//ADV7611_Write(0x98, 0x03, 0x20);
+	
+	ADV7611_Write(0x98, 0x04, 0x42);
+	ADV7611_Write(0x98, 0x05, 0x28);
+	ADV7611_Write(0x98, 0x06, 0xA6);
+	ADV7611_Write(0x98, 0x0B, 0x44);
+	ADV7611_Write(0x98, 0x0C, 0x42);
+	ADV7611_Write(0x98, 0x15, 0x80);
+	ADV7611_Write(0x98, 0x19, 0x8A);
+	ADV7611_Write(0x98, 0x14, 0x7F);
+	ADV7611_Write(0x98, 0x33, 0x40);
+	ADV7611_Write(0x44, 0xBA, 0x01);
+	ADV7611_Write(0x64, 0x40, 0x81);
+	ADV7611_Write(0x68, 0x9B, 0x03);
+	ADV7611_Write(0x68, 0xC1, 0x01);
+	ADV7611_Write(0x68, 0xC2, 0x01);
+	ADV7611_Write(0x68, 0xC3, 0x01);
+	ADV7611_Write(0x68, 0xC4, 0x01);
+	ADV7611_Write(0x68, 0xC5, 0x01);
+	ADV7611_Write(0x68, 0xC6, 0x01);
+	ADV7611_Write(0x68, 0xC7, 0x01);
+	ADV7611_Write(0x68, 0xC8, 0x01);
+	ADV7611_Write(0x68, 0xC9, 0x01);
+	ADV7611_Write(0x68, 0xCA, 0x01);
+	ADV7611_Write(0x68, 0xCB, 0x01);
+	ADV7611_Write(0x68, 0xCC, 0x01);
+	ADV7611_Write(0x68, 0x00, 0x00);
+	ADV7611_Write(0x68, 0x83, 0xFE);
+	ADV7611_Write(0x68, 0x6F, 0x08);
+	ADV7611_Write(0x68, 0x85, 0x1F);
+	ADV7611_Write(0x68, 0x87, 0x70);
+	ADV7611_Write(0x68, 0x8D, 0x04);
+	ADV7611_Write(0x68, 0x8E, 0x1E);
+	ADV7611_Write(0x68, 0x1A, 0x8A);
+	ADV7611_Write(0x68, 0x57, 0xDA);
+	ADV7611_Write(0x68, 0x58, 0x01);
+	ADV7611_Write(0x68, 0x75, 0x10);
+}
+
+unsigned char vga_edid[256] = 
+{
+	0x00,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,
+	0x1E,0x6D,0xE4,0x57,0xA7,0x3D,0x01,0x00,
+	0x07,0x15,0x01,0x03,0x80,0x33,0x1D,0x78,
+	0xEA,0xC6,0x65,0xA0,0x59,0x58,0x9D,0x27,
+	0x0E,0x50,0x54,0xA7,0x6B,0x80,0xB3,0x00,
+	0x81,0x80,0x81,0x40,0x71,0x4F,0x01,0x01,
+	0x01,0x01,0x01,0x01,0x01,0x01,0x02,0x3A,
+	0x80,0x18,0x71,0x38,0x2D,0x40,0x58,0x2C,
+	0x45,0x00,0xFE,0x22,0x11,0x00,0x00,0x1E,
+	0x00,0x00,0x00,0xFD,0x00,0x38,0x4B,0x1E,
+	0x53,0x0F,0x00,0x0A,0x20,0x20,0x20,0x20,
+	0x20,0x20,0x00,0x00,0x00,0xFC,0x00,0x45,
+	0x32,0x33,0x36,0x30,0x0A,0x20,0x20,0x20,
+	0x20,0x20,0x20,0x20,0x00,0x00,0x00,0xFF,
+	0x00,0x31,0x30,0x37,0x4C,0x54,0x56,0x42,
+	0x32,0x44,0x33,0x31,0x39,0x0A,0x01,0x99,
+	
+};
+
+/*
+unsigned char vga_edid[256] = 
+    {0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 
+     0x10, 0xAC, 0x5A, 0x40, 0x53, 0x44, 0x47, 0x45, 
+     0x09, 0x15, 0x01, 0x03, 0x0E, 0x26, 0x1E, 0x78, 
+     0xEE, 0xEE, 0x95, 0xA3, 0x54, 0x4C, 0x99, 0x26,
+     0x0F, 0x50, 0x54, 0xA5, 0x4B, 0x00, 0x71, 0x4F,
+     0x81, 0x80, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 
+     0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x30, 0x2A,
+     0x00, 0x98, 0x51, 0x00, 0x2A, 0x40, 0x30, 0x70,
+     0x13, 0x00, 0x78, 0x2D, 0x11, 0x00, 0x00, 0x1E,
+     0x00, 0x00, 0x00, 0xFF, 0x00, 0x43, 0x48, 0x52,
+     0x59, 0x4B, 0x31, 0x33, 0x33, 0x45, 0x47, 0x44,
+     0x53, 0x0A, 0x00, 0x00, 0x00, 0xFC, 0x00, 0x44,
+     0x45, 0x4C, 0x4C, 0x20, 0x50, 0x31, 0x39, 0x30,
+     0x53, 0x0A, 0x20, 0x20, 0x00, 0x00, 0x00, 0xFD,
+     0x00, 0x38, 0x4C, 0x1E, 0x51, 0x0E, 0x00, 0x0A,
+     0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x00, 0xBA,
+     };
+*/ 
+unsigned char audio_edid[128] = 
+    {0x02, 0x03, 0x15, 0x71, 0x41, 0x81, 0x23, 0x09,
+    0x07, 0x07, 0x83, 0x01, 0x00, 0x00, 0x66, 0x03,
+    0x0C, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0x00,
+    0x10, 0x00, 0x0A, 0x20, 0x20, 0x20, 0x20, 0x20,
+    0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x00,
+    0x00, 0x00, 0x10, 0x00, 0x0A, 0x20, 0x20, 0x20,
+    0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+    0x20, 0x00, 0x00, 0x00, 0x10, 0x00, 0x0A, 0x20,
+    0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+    0x20, 0x20, 0x20, 0x00, 0x00, 0x00, 0x10, 0x00,
+    0x0A, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+    0x20, 0x20, 0x20, 0x20, 0x20, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x88};	 
+
+
+unsigned char dtd_640x480[18] = 
+    { 0x8C, 0x0A, 0x80, 0xA0, 0x20, 0xE0, 0x2D, 0x10,
+      0x10, 0x60, 0xA2, 0x00, 0x80, 0xE0, 0x21, 0x00,
+      0x00, 0x18 };
+
+unsigned char min(unsigned char a, unsigned char b)
+{
+     return a < b ? a : b;
+}
+
+unsigned char calculate_checksum(unsigned char *block_beg)
+{
+     unsigned char sum=0;
+     unsigned char i;
+     
+     for (i=0; i<0x7F; i++)
+         sum += block_beg[i];
+         
+     return (~sum)+1; // Check this?!
+}
+	  
+void ADV7611_program_edid(unsigned char *data, int length)
+{
+	unsigned long i;
+	
+	ADV7611_Write(0x68, 0x6C, 0xA3); // enable manual HPA
+	ADV7611_Write(0x98, 0x20, 0x70); // HPD low
+	ADV7611_Write(0x64, 0x74, 0x00); // disable internal EDID
+
+	for (i=0; i<length; i++)
+		ADV7611_Write(0x6C, i, data[i]);
+
+	//for (i=0; i<800000; i++); // delay for HPA
+	Delay(10);
+
+	ADV7611_Write(0x64, 0x74, 0x01); // enable internal EDID
+	ADV7611_Write(0x98, 0x20, 0xF0); // HPD high
+	ADV7611_Write(0x68, 0x6C, 0xA3); // disable manual HPA
+}
+
+int min_pclk_from_std_tim_info(unsigned char *bytes)
+{
+     int xres = 0;
+     int yres = 0;
+     int vsfreq = 0;
+     int xratio[] = {16, 4, 5, 16};
+     int yratio[] = {10, 3, 4, 9};
+     int min_pclk;
+
+     if (bytes[0]==0x01 && bytes[1]==0x01)
+        return 0;
+     
+     xres = (bytes[0] + 31) * 8;
+     yres = (xres * yratio[(bytes[1] & 0xC0) >> 6]) / xratio[(bytes[1] & 0xC0) >> 6];
+     vsfreq = (bytes[1] & 0x3F) + 60;
+     
+     min_pclk = ((xres+1) * (yres+1) * vsfreq) / 1000000; // for PCLK in MHz 
+     return min_pclk;
+}
+
+void edid_prepare(unsigned char *new_edid)
+{
+     unsigned char i, j;
+     unsigned char *ptr;
+
+     // 0:19 = Header information
+     // 19:24 = Basic display information
+     // 25:34 = Chromacity coords
+     // 35:37 = Established bitmap timings (All these VESA can be supported
+     
+     new_edid[20] = 0; // Setting Video Input Parameters to 0 = Digital Input
+     
+     /* Bytes 38...53 = STD Timing Info */
+     for (i=38; i<54; i+=2)
+     {
+         /* If minimum pclk calculated from std_timing info is above 165 MHz - 
+            - the mode is dropped */
+         if (min_pclk_from_std_tim_info(new_edid+i) > 165) {
+                  new_edid[i]   = 0x01;
+                  new_edid[i+1] = 0x01;
+         }
+     }
+     
+     /* Bytes 54...71 = Descriptor 1
+        Bytes 72...89 = Descriptor 2
+        Bytes 90...107 = Descriptor 3
+        Bytes 108...125 = Descriptor 4 */
+     for (i=54; i<125; i+=18) {
+         ptr = &new_edid[i];
+         
+         /* Detailed Timing Information */
+           if (((ptr[0]*256 + ptr[1])/100) > 165) {
+              /* DTD Lists mode that is with PCLK > 165 MHz */
+               for (j=0; j<18; j++)
+                   ptr[j] = dtd_640x480[j]; // replacing DTD with 640x480
+           } else {
+               if ((ptr[0]==0 && ptr[1] == 0) && (ptr[3]==253)) {
+                     // Monitor Range Descriptor      
+                     ptr[9] = min(ptr[9], 17); // Minumum of: monitor's max pclk,165MHz
+               }
+           }
+     }
+     
+     new_edid[126] = 1; // One CEA 861 Extension
+     new_edid[127] = calculate_checksum(new_edid);
+     for (i=0; i<128; i++)
+          new_edid[i+0x80] = audio_edid[i];
+     new_edid[255] = calculate_checksum(new_edid+0x80);
+}
+
+
+void ADV7611_Test_Help(void)
+{
+	Dprintf("========== ADV7611 Test ==========\n");
+	Dprintf("1. Reg Write\n");
+	Dprintf("2. Reg Read\n");
+	Dprintf("q. Quit\n");
+}
+
+extern void BSP_I2C_PortInit(void);
+void ADV7611_Test(void)
+{
+    char    		sd;
+	uint8_t		slv_addr;
+	uint8_t		sub_addr;
+	uint8_t		data;
+
+	BSP_I2C_PortInit();	// PORT 를 사용해서 I2C를 구현한다.
+	VideoScreen(ON);
+
+	Dprintf("Video Display ON\n");
+	/*
+	ADV7611_Write(0x98, 0xFF, 0x80); // RESET part and wait (no ACK after reset)
+	Delay(10);
+	*/
+
+	Dprintf("ADV7611 Init Start\n");
+	ADV7611_Init();
+
+	//edid_prepare(vga_edid); // Modifies EDID read from monitor and adds CEA861 block.
+	
+	Dprintf("ADV7611 EDID Start\n");
+	ADV7611_program_edid(vga_edid, 256); // program modified EDID
+	
+    while(1)
+    {
+		ADV7611_Test_Help();
+        sd = Dgetch();
+		
+        if(sd=='1') //Write Reg
+        {
+            Dprintf("ADV7611 Write SLAVE Register:");
+            slv_addr = DgetIntNum();
+
+            Dprintf("ADV7611 Write SUB Register:");
+            sub_addr = DgetIntNum();
+
+            Dprintf("ADV7611 Write Data:");
+            data = DgetIntNum();
+
+			ADV7611_Write(slv_addr, sub_addr, data);
+			
+			//data = ADV7611_Read(slv_addr, sub_addr);
+            Dprintf("WRITE------------------------------->Read Verify:%02x\n", data);
+            
+        }
+        else if(sd=='2') //Read Reg
+        {
+            Dprintf("ADV7611 Read SLAVE Register:");
+            slv_addr = DgetIntNum();
+
+            Dprintf("ADV7611 Read SUB Register:");
+            sub_addr = DgetIntNum();
+
+			data = ADV7611_Read(slv_addr, sub_addr);
+            Dprintf("READ------------------------------->Read Verify:%02x\n", data);
+            
+        }
+		else if(sd=='q')
+		{
+			break;
+		}
+	}
+	
+}
+
+
+
+void ADV7611_Write(uint8_t slv_addr, uint8_t sub_addr, uint8_t data)
+{
+    I2C_Start();
+    I2C_Clock_Data(slv_addr);
+
+    I2C_ACK();                      
+
+    I2C_Clock_Data(sub_addr);        
+
+    I2C_ACK();                      
+
+    I2C_Clock_Data(data);           
+
+    I2C_ACK();                      
+
+    I2C_Stop();                     
+}
+
+uint8_t ADV7611_Read(uint8_t slv_addr, uint8_t sub_addr)
+{
+    u8 data=0x00;
+
+    I2C_Start();
+    I2C_Clock_Data(slv_addr);           
+	
+    I2C_ACK();                      
+
+    I2C_Clock_Data(sub_addr);
+	
+    I2C_ACK();                      
+
+	I2C_Start();
+
+    I2C_Clock_Data(slv_addr+1);
+	
+    I2C_ACK();                      
+
+    I2CSDAPort_Input();
+
+	if(GPIO_ReadInputDataBit(GPIOB,SDA)) data |= 0x80;
+	I2C_Clk();
+	if(GPIO_ReadInputDataBit(GPIOB,SDA)) data |= 0x40;
+	I2C_Clk();
+	if(GPIO_ReadInputDataBit(GPIOB,SDA)) data |= 0x20;
+	I2C_Clk();
+	if(GPIO_ReadInputDataBit(GPIOB,SDA)) data |= 0x10;
+	I2C_Clk();
+	if(GPIO_ReadInputDataBit(GPIOB,SDA)) data |= 0x08;
+	I2C_Clk();
+	if(GPIO_ReadInputDataBit(GPIOB,SDA)) data |= 0x04;
+	I2C_Clk();
+	if(GPIO_ReadInputDataBit(GPIOB,SDA)) data |= 0x02;
+	I2C_Clk();
+	if(GPIO_ReadInputDataBit(GPIOB,SDA)) data |= 0x01;
+	I2C_Clk();
+
+    I2C_Stop();
+    return ( data );
+}
+
+#endif
+#ifdef __cplusplus
+}
+#endif
